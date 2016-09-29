@@ -1,0 +1,13 @@
+{
+    "name": "yash/cc-bot",
+    "authors": [
+        {
+            "name": "Yash",
+            "email": "dev@email.com"
+        }
+    ],
+    "require": {
+      "rmccue/requests": "^1.6"
+    }
+
+}
