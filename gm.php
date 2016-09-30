@@ -194,7 +194,7 @@ function gm_respond($gm, $row)
                           $message = $cc->delete_call($num, $name);
                       }
                   break;
-                  case 'clear_call':
+                  case 'clear_call_for':
                       $num = intval($out[1]);
                       $name = trim($out[2]);
                       if ($invalid_cc) {
@@ -270,10 +270,18 @@ function gm_respond($gm, $row)
                       }
                   break;
                   case 'cc_url':
-                      $message = sprintf('http://www.clashcaller.com/war/%s', $row['cc']);
+                      if($invalid_cc){
+                          $message = "CC code not set. Type /help admin to see commands.";
+                      }else{
+                          $message = sprintf('http://www.clashcaller.com/war/%s', $row['cc']);
+                      }
                   break;
                   case 'cc_code':
-                      $message = $row['cc'];
+                      if($invalid_cc){
+                          $message = "CC code not set. Type /help admin to see commands.";
+                      }else{
+                          $message = $row['cc'];
+                      }
                   break;
                   case 'update_war_timer':
                       $st = $out[1];
@@ -346,20 +354,6 @@ function gm_respond($gm, $row)
                           }
                       }
                   break;
-                  case 'update_call_timer':
-                      $timer = intval($out[1]);
-                      if ($cc->is_admin($uid_, $admins)) {
-                          if ($timer > 0 && $timer < 24) {
-                              mysqli_query($GLOBALS['con'], "UPDATE cc SET call_timer = {$timer} WHERE id = '{$row_id}'");
-                              $message = 'Clash Caller timer set to '.$out[1].' hours';
-                          } else {
-                              $message = 'Set timer between 0 to 24 hours only';
-                          }
-                      } else {
-                          $message = 'Only admins can change CC settings, '.$name_;
-                      }
-                  break;
-
                   case 'my_stats':
                       $pl_name = $name_;
                       $go_on = true;
@@ -381,6 +375,20 @@ function gm_respond($gm, $row)
                           $message = $cc->get_stats($row['clan_tag'], $pl_name);
                       }
                   break;
+                  case 'update_call_timer':
+                      $timer = intval($out[1]);
+                      if ($cc->is_admin($uid_, $admins)) {
+                          if ($timer > 0 && $timer < 24) {
+                              mysqli_query($GLOBALS['con'], "UPDATE cc SET call_timer = {$timer} WHERE id = '{$row_id}'");
+                              $message = 'Clash Caller timer set to '.$out[1].' hours';
+                          } else {
+                              $message = 'Set timer between 0 to 24 hours only';
+                          }
+                      } else {
+                          $message = 'Only admins can change CC settings, '.$name_;
+                      }
+                  break;
+
                   case 'cc_bd':
                       $bd = trim($out[1]);
                       $ths = trim($out[2]);
