@@ -1,0 +1,5 @@
+Options +FollowSymLinks
+RewriteEngine On
+RewriteRule ^bot/([^/]+) bot.php?id=$1 [NC]
+RewriteRule ^install install.php [NC]
+RewriteRule ^install?access_token=(.*) install.php?access_token=$1 [NC]

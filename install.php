@@ -4,7 +4,7 @@ require 'gm.php';
 $logged_in = false;
 $bot_config = array('avatar' => 'http://www.clashcaller.com/images/cc.png',
                     'name' => $main_config['bot_name'],
-                    'callback' => sprintf('http://%s%s/bot/', $_SERVER['HTTP_HOST'], implode('/', array_slice(explode('/', $_SERVER['PHP_SELF']), 0, -1))));
+                    'callback' => sprintf('http://%s%s/bot/', $_SERVER['HTTP_HOST'], implode('/', array_slice(explode('/', $_SERVER['PHP_SELF']), 0, -1))), );
 if (isset($_GET['access_token'])) {
     $token = $_GET['access_token'];
     $_COOKIE['token'] = $token;
@@ -14,13 +14,13 @@ if (isset($_GET['access_token'])) {
     $body = json_decode($user->body, true);
     $uid = $body['response']['user_id'];
     mysqli_query($con, "UPDATE `cc` SET user_token = '{$token}' WHERE admin_id = '{$uid}'");
-    header('Location: install');
+    header("Location: install");
 }
 $message = '';
 if (isset($_POST['install_bot'])) {
     $group_id = $_POST['group_id'];
     $token = $_POST['install_bot'];
-    if (trim(strlen($_POST['bot_name'])) > 0) {
+    if(trim(strlen($_POST['bot_name'])) > 0){
         $bot_config['name'] = trim($_POST['bot_name']);
     }
     if ($main_config['single_bot_per_user']) {
@@ -46,18 +46,18 @@ if (isset($_COOKIE['token'])) {
     $bot_list = json_decode($bot_page->body, true);
     $bot_list_table = array();
     $bot_ids = array();
-    foreach ($bot_list['response'] as $bot) {
+    foreach($bot_list['response'] as $bot){
         array_push($bot_ids, $bot['bot_id']);
         $parsed_callback = parse_url($bot['callback_url']);
-        if ($parsed_callback['host'] == $_SERVER['HTTP_HOST']) {
-            $thx_ = sprintf('<tr><td>%s</td><td>%s</td><td><a class="button" href="?delete_bot=%s">Delete</a> <a target="_blank" class="button" href="https://dev.groupme.com/bots/%s/edit">Edit</a></td></tr>', $bot['name'], $bot['group_name'], $bot['bot_id'], $bot['bot_id']);
+        if($parsed_callback['host'] == $_SERVER['HTTP_HOST']){
+            $thx_ = sprintf("<tr><td>%s</td><td>%s</td><td><a class=\"button\" href=\"?delete_bot=%s\">Delete</a> <a target=\"_blank\" class=\"button\" href=\"https://dev.groupme.com/bots/%s/edit\">Edit</a></td></tr>", $bot['name'], $bot['group_name'], $bot['bot_id'], $bot['bot_id']);
             array_push($bot_list_table, $thx_);
             mysqli_query($con, sprintf("UPDATE cc SET group_name = '%s', group_id = '%d' WHERE bot_id = '%s'", $bot['group_name'], $bot['group_id'], $bot['bot_id']));
         }
     }
     $listed_bots = mysqli_query($con, "SELECT * FROM `cc` WHERE user_token = '{$token}'");
-    while ($sq_bots = mysqli_fetch_array($listed_bots)) {
-        if (!in_array($sq_bots['bot_id'], $bot_ids)) {
+    while($sq_bots = mysqli_fetch_array($listed_bots)){
+        if(!in_array($sq_bots['bot_id'], $bot_ids)){
             mysqli_query($con, "DELETE FROM `cc` WHERE bot_id = '{$sq_bots['bot_id']}'");
         }
     }
@@ -70,14 +70,14 @@ if (isset($_COOKIE['token'])) {
     $group_list = implode("\n", $group_list);
     $logged_in = true;
 }
-if (isset($_GET['delete_bot'])) {
-    if (!$logged_in) {
+if(isset($_GET['delete_bot'])){
+    if(!$logged_in){
         $message = 'Not logged in';
-    } else {
+    }else{
         $bot_id = $_GET['delete_bot'];
         Requests::post(sprintf('%s/bots/destroy?token=%s', $gm_api, $token), array(), array('bot_id' => $bot_id));
         mysqli_query($con, "DELETE FROM `cc` WHERE bot_id = '{$bot_id}'");
-        header('Location: install');
+        header("Location: install");
     }
 }
 ?>
@@ -99,29 +99,22 @@ if (isset($_GET['delete_bot'])) {
     <blockquote>
     Add this bot to your group to easily access the caller from the group itself.
   </blockquote>
-  <?php if ($message != '') {
-    ?>
+  <?php if($message != ""){ ?>
       <blockquote>
-        <p><em><?php echo $message;
-    ?></em></p>
+        <p><em><?php echo $message; ?></em></p>
       </blockquote>
-    <?php
-} ?>
-    <?php if ($logged_in) {
-    ?>
+    <?php } ?>
+    <?php if($logged_in){ ?>
     <form action="install" method="post">
-        <input type="hidden" name="install_bot" value="<?php echo $token;
-    ?>" />
+        <input type="hidden" name="install_bot" value="<?php echo $token; ?>" />
         <input type="text" placeholder="Bot name" name="bot_name" />
         <select name="group_id">
             <option>Select group</option>
-            <?php echo $group_list;
-    ?>
+            <?php echo $group_list; ?>
         </select>
         <input type="submit" value="Make CC Bot" />
     </form>
-    <?php if (count($bot_list_table) > 0) {
-    ?>
+    <?php if(count($bot_list_table) > 0) { ?>
     <table>
         <thead>
             <tr>
@@ -131,20 +124,13 @@ if (isset($_GET['delete_bot'])) {
             </tr>
         </thead>
         <tbody>
-            <?php echo implode("\n", $bot_list_table);
-    ?>
+            <?php echo implode("\n", $bot_list_table); ?>
         </tbody>
     </table>
-    <?php
-}
-    ?>
-    <?php
-} else {
-    ?>
-      <a class="button" href="<?php echo $oauth_link;
-    ?>">Click here to start</a>
-    <?php
-} ?>
+    <?php } ?>
+    <?php }else{ ?>
+      <a class="button" href="<?php echo $oauth_link; ?>">Click here to start</a>
+    <?php } ?>
 <pre>
 
   Caller commands:
@@ -159,11 +145,17 @@ if (isset($_GET['delete_bot'])) {
     <strong>/delete call on # by [player name]</strong> - Delete call by player
     <strong>/get calls</strong> - Get active calls
     <strong>/get all calls</strong> - Get all calls
+    <strong>/get war status</strong> - Get status on war
+    <strong>/my stats</strong> - View your stats
+    <strong>/stats for [player name]</strong> - View player stats
+
 
   Admin commands:
     <strong>/start war [war size] [enemy name]</strong> - Start new caller
     <strong>/set cc [code]</strong> - Set code
+    <strong>/set breakdown [#/#/#/#] [#/#/#/#]</strong> - Set townhall breakdown on CC
     <strong>/update war timer [end|start] [timer]</strong> - Change war timer. Timer format: ##h##m
+    <strong>/cc timer # hours</strong> - Set call timer on CC
     <strong>/set clan name [clan name]</strong> - Set clan name
     <strong>/set clan tag [clan tag]</strong> - Set clan tag
     <strong>/cc archive [on|off]</strong> - CC archive toggle
@@ -184,6 +176,11 @@ if (isset($_GET['delete_bot'])) {
     /cc stacked calls on
     /set clan name Reddit Mu
     /set clan tag 2GQ8YVV8
+
+
+    Format for 30 person war:
+    /set breakdown 2/6/22 11/10/9
+    For 2 TH11, 6 TH10, 22 TH9 in the enemy roster
 
   <u>Of course # is a number.</u>
 

@@ -1,5 +1,4 @@
 <?php
-
 require 'config.php';
 require 'cc.php';
 function safe_sql($con, $arr)
@@ -18,30 +17,29 @@ function post_gm($text, $bot_id)
 {
     Requests::post('https://api.groupme.com/v3/bots/post', array(), array(
         'bot_id' => $bot_id,
-        'text' => $text
+        'text' => $text,
     ));
 }
-function install_bot($group_id, $token, $bot_config)
-{
-    $user = Requests::get(sprintf('%s/users/me?token=%s', $GLOBALS['gm_api'], $token));
+function install_bot($group_id, $token, $bot_config){
+    $user = Requests::get(sprintf("%s/users/me?token=%s", $GLOBALS['gm_api'], $token));
     $user_body = json_decode($user->body, true);
     $admin_id = $user_body['response']['id'];
     $id = dechex(mt_rand());
 
-    $p1 = Requests::get(sprintf('%s/groups/%d?token=%s', $GLOBALS['gm_api'], $group_id, $token));
-    $pbody1 = json_decode($p1->body, true);
+    $p1 = Requests::get(sprintf("%s/groups/%d?token=%s", $GLOBALS['gm_api'], $group_id, $token));
+    $pbody1 = json_decode($p1 -> body, true);
     $group_name = $pbody1['response']['name'];
 
     $bot_make = array('bot' => array('name' => $bot_config['name'],
                                       'group_id' => $group_id,
                                       'avatar_url' => $bot_config['avatar'],
-                                      'callback_url' => $bot_config['callback'].$id));
-    $bot_create = Requests::post(sprintf('%s/bots?token=%s', $GLOBALS['gm_api'], $token), array('Content-Type' => 'application/json'), json_encode($bot_make));
+                                      'callback_url' => $bot_config['callback'] . $id));
+    $bot_create = Requests::post(sprintf("%s/bots?token=%s", $GLOBALS['gm_api'], $token), array('Content-Type' => 'application/json'), json_encode($bot_make));
     $bot_page = json_decode($bot_create->body, true);
 
     $admin_name = '';
-    foreach ($pbody1['response']['members'] as $mem) {
-        if ($mem['user_id'] == $user_body['response']['id']) {
+    foreach($pbody1['response']['members'] as $mem){
+        if($mem['user_id'] == $user_body['response']['id']){
             $admin_id = $mem['user_id'];
             $admin_name = $mem['nickname'];
         }
@@ -61,19 +59,19 @@ function install_bot($group_id, $token, $bot_config)
                   'archive' => 0,
                   'stacked_calls' => 0,
                   'call_timer' => 2);
-    mysqli_query($GLOBALS['con'], 'INSERT INTO `cc`'.safe_sql($GLOBALS['con'], $ins));
+    mysqli_query($GLOBALS['con'], "INSERT INTO `cc`" . safe_sql($GLOBALS['con'], $ins));
     post_gm("Welcome to Clash Caller bot. Type '/bot status' to see current status.\n/help admin - see admin commands\n/help - see normal commands", $bot_id);
-    return 'Bot made successfully';
+    return "Bot made successfully";
 }
 function gm_respond($gm, $row)
 {
-    $install_link = sprintf('http://%s%s/install', $_SERVER['HTTP_HOST'], implode('/', array_slice(explode('/', $_SERVER['PHP_SELF']), 0, -1)));
+    $install_link = 'http://cc-butttons.rhcloud.com/install';
     $config = array(
           'clan_name' => $row['clan_name'],
           'clan_tag' => $row['clan_tag'],
           'call_timer' => $row['call_timer'],
           'archive' => $row['archive'],
-          'stacked_calls' => $row['stacked_calls']
+          'stacked_calls' => $row['stacked_calls'],
       );
     $row_cc = $row['cc'];
     $cc = new ClashCaller();
@@ -87,6 +85,36 @@ function gm_respond($gm, $row)
     $admins = json_decode($row['admins'], true);
     $row_id = $row['id'];
 
+
+    $admin_commands = array('CC admin commands: ',
+                      '/start war [war size] [enemy name] - Start new caller',
+                      '/set cc [code] - Set code',
+                      '/set breakdown [#/#/#/#] [#/#/#/#] - Set townhall breakdown on CC',
+                      '/update war timer [end|start] [timer] - Change war timer (##h##m)',
+                      '/set clan name [clan name] - Set clan name',
+                      '/set clan tag [clan tag] - Set clan tag',
+                      '/cc timer # hours - Set call timer on CC',
+                      '/cc archive [on|off] - CC archive toggle',
+                      '/cc stacked calls [on|off] - Stacked calls toggle',
+                      '/cc promote @[player name] - Promote player to admin',
+                      '/cc demote @[player name] - Demote player from admin'
+                    );
+    $cc_commands = array('CC commands: ',
+                      '/bot status - See bot status',
+                      '/cc - Get CC link',
+                      '/cc code - Get CC code',
+                      '/call # - Call target',
+                      '/call # for [player name] - Call target for player',
+                      '/attacked # for # stars - Log attack',
+                      '/log # stars on # by [player name] - Log attack for player',
+                      '/delete call # - Delete call',
+                      '/delete call on # by [player name] - Delete call by player',
+                      '/get calls - Get active calls',
+                      '/get all calls - Get all calls',
+                      '/get war status - Get status on war',
+                      '/my stats - View your stats',
+                      '/stats for [player name] - View stats for player');
+
     $regex_ = array(
       'call' => "/^\/call (\d+)\s*$/i",
       'call_for' => "/^\/call (\d+) for\s+(.*)$/i",
@@ -94,6 +122,7 @@ function gm_respond($gm, $row)
       'clear_call_for' => "/^\/delete call on (\d+) by (.*)$/i",
       'get_calls' => "/^\/get calls\s*$/i",
       'get_all_calls' => "/^\/get all calls\s*$/i",
+      'get_war_status' => "/^\/get war status\s*$/i",
       'log_attack' => "/^\/attacked (\d+) for (\d+) star[s]?\s*$/i",
       'log_attack_for' => "/^\/log (\d+) star[s]? on (\d+) by (.*)$/i",
       'help' => "/^\/help\s*$/i",
@@ -104,6 +133,8 @@ function gm_respond($gm, $row)
       'cc_code' => "/^\/cc code\s*$/i",
       'examples' => "/^\/examples/i",
       'status' => "/^\/bot status/i",
+      'my_stats' => "/^\/my stats/i",
+      'stats_for' => "/^\/stats for (.*)/i",
       'update_war_timer' => "/^\/update war timer (end|start) (\d+h\d+m)/i",
       'update_clan_name' => "/^\/set clan name (.*)/i",
       'update_clan_tag' => "/^\/set clan tag (.*)/i",
@@ -111,7 +142,8 @@ function gm_respond($gm, $row)
       'update_archive' => "/^\/cc archive (on|off)/i",
       'update_call_timer' => "/^\/cc timer (\d+) hours/i",
       'admin_promote' => "/^\/cc promote (.*)/",
-      'admin_demote' => "/^\/cc demote (.*)/"
+      'admin_demote' => "/^\/cc demote (.*)/",
+      'cc_bd' => "/^\/set breakdown ([\d\/]+) ([\d\/\.]+)/",
       );
     $command_found = false;
     $message = '';
@@ -121,32 +153,10 @@ function gm_respond($gm, $row)
             $command_found = true;
             switch ($key) {
                   case 'help':
-                      $commands = array('CC commands: ',
-                                      '/cc - Get CC link',
-                                      '/cc code - Get CC code',
-                                      '/bot status - See bot status',
-                                      '/call # - Call target',
-                                      '/call # for [player name] - Call target for player',
-                                      '/attacked # for # stars - Log attack',
-                                      '/log # stars on # by [player name] - Log attack for player',
-                                      '/delete call # - Delete call',
-                                      '/delete call on # by [player name] - Delete call by player',
-                                      '/get calls - Get active calls',
-                                      '/get all calls - Get all calls');
-                      $message = implode("\n", $commands);
+                      $message = implode("\n", $cc_commands);
                   break;
                   case 'help_admin':
-                      $commands = array('CC admin commands: ',
-                                        '/start war [war size] [enemy name] - Start new caller',
-                                        '/set cc [code] - Set code',
-                                        '/update war timer [end|start] [timer] - Change war timer (##h##m)',
-                                        '/set clan name [clan name] - Set clan name',
-                                        '/set clan tag [clan tag] - Set clan tag',
-                                        '/cc archive [on|off] - CC archive toggle',
-                                        '/cc stacked calls [on|off] - Stacked calls toggle',
-                                        '/cc promote @[player name] - Promote player to admin',
-                                        '/cc demote @[player name] - Demote player from admin');
-                      $message = implode("\n", $commands);
+                      $message = implode("\n", $admin_commands);
                   break;
                   case 'set_cc':
                       $code = trim($out[1]);
@@ -195,19 +205,28 @@ function gm_respond($gm, $row)
                   break;
                   case 'get_calls':
                       $update = $cc->get_update();
-                      $calls = $cc->format_calls($update, true);
                       if ($invalid_cc) {
                           $message = $invalid_cc_error;
                       } else {
+                          $calls = $cc->format_calls($update, true);
                           $message = implode("\n", $calls);
                       }
                       break;
                   case 'get_all_calls':
                       $update = $cc->get_update();
-                      $calls = $cc->format_calls($update, false);
                       if ($invalid_cc) {
                           $message = $invalid_cc_error;
                       } else {
+                          $calls = $cc->format_calls($update, false);
+                          $message = implode("\n", $calls);
+                      }
+                  break;
+                  case 'get_war_status':
+                      $update = $cc->get_update();
+                      if ($invalid_cc) {
+                          $message = $invalid_cc_error;
+                      } else {
+                          $calls = $cc->get_war_status($update);
                           $message = implode("\n", $calls);
                       }
                   break;
@@ -338,6 +357,39 @@ function gm_respond($gm, $row)
                           }
                       } else {
                           $message = 'Only admins can change CC settings, '.$name_;
+                      }
+                  break;
+
+                  case 'my_stats':
+                      $pl_name = $name_;
+                      $go_on = true;
+                      if ($row['clan_tag'] == '') {
+                          $go_on = false;
+                          $message = "Please set clan tag first view player stats. Type '/help admin' to view commands";
+                      }else{
+                          $message = $cc->get_stats($row['clan_tag'], $pl_name);
+                      }
+                  break;
+
+                  case 'stats_for':
+                      $pl_name = trim($out[1]);
+                      $go_on = true;
+                      if ($row['clan_tag'] == '') {
+                          $go_on = false;
+                          $message = "Please set clan tag first view player stats. Type '/help admin' to view commands";
+                      }else{
+                          $message = $cc->get_stats($row['clan_tag'], $pl_name);
+                      }
+                  break;
+                  case 'cc_bd':
+                      $bd = trim($out[1]);
+                      $ths = trim($out[2]);
+                      if ($cc->is_admin($uid_, $admins)) {
+                          $update = $cc->get_update();
+                          post_gm("Updating townhall breakdown on CC", $row['bot_id']);
+                          $message = $cc->set_breakdown($update, $bd, $ths);
+                      } else {
+                          $message = 'Only admins can update townhall breakdown, '.$name_;
                       }
                   break;
                   case 'admin_promote':
