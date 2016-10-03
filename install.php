@@ -40,8 +40,6 @@ if (isset($_POST['install_bot'])) {
 }
 if (isset($_COOKIE['token'])) {
     $token = $_COOKIE['token'];
-    $group_list = array();
-
     $bot_page = Requests::get(sprintf('%s/bots?token=%s', $gm_api, $token));
     $bot_list = json_decode($bot_page->body, true);
     $bot_list_table = array();
@@ -68,6 +66,7 @@ if (isset($_COOKIE['token'])) {
         array_push($group_list, $op_);
     }
     $group_list = implode("\n", $group_list);
+
     $logged_in = true;
 }
 if(isset($_GET['delete_bot'])){
@@ -91,10 +90,15 @@ if(isset($_GET['delete_bot'])){
   <link href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.1.0/milligram.min.css" rel="stylesheet">
 </head>
 <body>
+  <style>
+  code {font-size: 100%}
+  pre {font-size: 13px}
+  </style>
   <div class="container">
     <div class="row">
     <div class="column column-80 column-offset-10">
       <a href="https://github.com/butttons/cc-bot" target="_blank" class="button button-outline float-right">Get source</a>
+      <a href="https://groupme.com/join_group/25440271/j0WbsM" target="_blank" class="button button-outline float-right">Join GroupMe Demo room</a>
     <h1>Clash Caller Bot</h1>
     <blockquote>
     Add this bot to your group to easily access the caller from the group itself.
@@ -131,37 +135,102 @@ if(isset($_GET['delete_bot'])){
     <?php }else{ ?>
       <a class="button" href="<?php echo $oauth_link; ?>">Click here to start</a>
     <?php } ?>
+    <h2>FAQ: </h2>
+    <ul>
+      <li>
+        <strong>How do I get this bot for my group?</strong>
+        <blockquote>
+          Start by clicking on the 'Click here to start' button. Once you've authenticated with groupme, put the bot name and select the group where the bot will live, and click 'Make CC Bot'
+        </blockquote>
+      </li>
+      <li>
+        <strong>How do get started on setting it up?</strong>
+        <blockquote>
+          Once you've installed the bot, you should set your clan name first by typing <code>/set clan name [your clan name]</code>. No brackets.
+          Now you can set the caller code manually <code>/set cc [code]</code>, or start a new war by <code>/start war [size] [enemy name]</code>. Where <code>size</code> is the size of war.
+        </blockquote>
+      </li>
+      <li>
+        <strong>Is it connected to clash caller?</strong>
+        <blockquote>
+          Yes, all changes made by the bot are reflected on clash caller.
+        </blockquote>
+      </li>
+      <li>
+        <strong>I can't see assigned bases on the clash caller website. Why is that?</strong>
+        <blockquote>
+          That feature isn't implemented in clash caller yet, it's a bot only feature. Admins can assign bases to player to attack, and the player can see which base it is, and can either decline it or call it.
+        </blockquote>
+      </li>
+      <li>
+        <strong>Why do no stats show for my player name?</strong>
+        <blockquote>
+          Stats are fetched from archived wars in clash caller website. Your clan tag must be correct and the player name in order to fetch correct stats.
+        </blockquote>
+      </li>
+      <li>
+        <strong>What does stacked calls mean?</strong>
+        <blockquote>
+          If stacked calls are turned on, no more calls can be made on a base until it's previous call is expired or logged stars on. While using <code>/get all calls</code>, only the calls with the highest stars is shown, otherwise all calls are shown of a target.
+        </blockquote>
+      </li>
+
+
+    </ul>
+
 <pre>
 
-  Caller commands:
-    <strong>/cc</strong> - Get CC link
-    <strong>/cc code</strong> - Get CC code
-    <strong>/bot status</strong> - See bot status
-    <strong>/call #</strong> - Call target
-    <strong>/call # for [player name]</strong> - Call target for player
-    <strong>/attacked # for # stars</strong> - Log attack
-    <strong>/log # stars on # by [player name]</strong> - Log attack for player
-    <strong>/delete call #</strong> - Delete call
-    <strong>/delete call on # by [player name]</strong> - Delete call by player
-    <strong>/get calls</strong> - Get active calls
-    <strong>/get all calls</strong> - Get all calls
-    <strong>/get war status</strong> - Get status on war
-    <strong>/my stats</strong> - View your stats
-    <strong>/stats for [player name]</strong> - View player stats
+   Commands:
+    /bot status - See bot status
+    /help - Show caller commands
+    /help full - Show all commands
+    /help admin - Show admin commands
+
+    /cc - Get CC link
+    /cc code - Get CC code
+
+    /call # - Call target
+    /call # for [player name] - Call target for player
+
+    /attacked # for # stars - Log attack
+    /log # stars on # by [player name] - Log attack for player
+
+    /delete call # - Delete call
+    /delete call on # by [player name] - Delete call by player
+
+    /get calls - Get active calls
+    /get all calls - Get all calls
+    /get war status - Get status on war
+
+    /get note # - Get note on target
+    /update note # [note] - Update note on target
+
+    /my stats - View your stats
+    /stats for [player name] - View stats for player
+
+    /get my base - Get base assigned to you
+    /decline my base - Decline base assigned to you
 
 
   Admin commands:
-    <strong>/start war [war size] [enemy name]</strong> - Start new caller
-    <strong>/set cc [code]</strong> - Set code
-    <strong>/set breakdown [#/#/#/#] [#/#/#/#]</strong> - Set townhall breakdown on CC
-    <strong>/update war timer [end|start] [timer]</strong> - Change war timer. Timer format: ##h##m
-    <strong>/cc timer # hours</strong> - Set call timer on CC
-    <strong>/set clan name [clan name]</strong> - Set clan name
-    <strong>/set clan tag [clan tag]</strong> - Set clan tag
-    <strong>/cc archive [on|off]</strong> - CC archive toggle
-    <strong>/cc stacked calls [on|off]</strong> - Stacked calls toggle
-    <strong>/cc promote @[player name]</strong> - Promote player to admin
-    <strong>/cc demote @[player name]</strong> - Demote player from admin
+    /start war [war size] [enemy name] - Start new caller
+    /set cc [code] - Set code
+    /update war timer [end|start] [timer] - Change war timer (##h##m)
+
+    /set breakdown [#/#/#/#] [#/#/#/#] - Set townhall breakdown on CC
+
+    /set clan name [clan name] - Set clan name
+    /set clan tag [clan tag] - Set clan tag
+
+    /cc timer # hours - Set call timer on CC
+    /cc archive [on|off] - CC archive toggle
+    /cc stacked calls [on|off] - Stacked calls toggle
+    /cc promote @[player name] - Promote player to admin
+    /cc demote @[player name] - Demote player from admin
+
+    /assign # to @[player name] - Assign base to tagged player
+    /clear assigned base # - Delete base assigned for players
+    /clear all assigned bases - Delete all assigned bases for the war
 
   Examples:
     /call 2

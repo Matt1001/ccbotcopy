@@ -120,9 +120,11 @@ class ClashCaller
                       'warcode' => $this->cc,
                       'posy' => $num - 1,
                       'value' => $name);
-
+        $all = $this -> get_update();
+        if($num > intval($all['general']['size'])){
+            return "Target out of bounds";
+        }
         if(!$this -> config['stacked_calls']){
-            $all = $this -> get_update();
             $calls = $this -> serialize_calls($all['calls'], $all['general']);
             $y_ = $num - 1;
             $found_call = false;
@@ -175,25 +177,33 @@ class ClashCaller
     public function get_war_status($data){
         $now = strtotime($data['general']['checktime']);
         $war_start = strtotime($data['general']['starttime']);
+        $war_end = $war_start + $this -> timer_to_second('24h00m');
         $war_started = false;
         $war_size = intval($data['general']['size']);
         $diff = $war_start - $now;
-        if($war_start < $now){
-            $war_started = true;
-            $diff = $war_start + $this -> timer_to_second('24h00m') - $now;
-        }
-        $war_time = $this->second_to_timer($diff);
         $out = array();
         $calls = $this -> serialize_calls($data['calls'], $data['general'], false);
         $targets = isset($data['targets']) ? $this -> serialize_targets($data['targets']) : false;
         $out = array();
-        array_push($out, sprintf("War %s in %s vs %s", ($war_started ? 'ends' : 'starts'), $war_time, $data['general']['enemyname']));
+        if($war_start < $now){
+            $war_started = true;
+            $diff = $war_end - $now;
+        }
+        if($now > $war_end){
+            array_push($out, sprintf("War has finished vs %s", $data['general']['enemyname']));
+        }else {
+            $war_time = $this->second_to_timer($diff);
+            array_push($out, sprintf("War %s in %s vs %s", ($war_started ? 'ends' : 'starts'), $war_time, $data['general']['enemyname']));
+        }
         for($i = 0; $i < $war_size; $i++){
             $target_name_ = '';
             $num_ = $i;
             $status_ = 'not attacked';
-            if($targets){
-                if(isset($targets[$i])) $target_name_ = sprintf(" (%s)", $targets[$i]);
+
+            if(isset($targets[$i])) {
+                if(strlen($targets[$i]['name']) > 0){
+                    $target_name_ = sprintf(" (%s)", $targets[$i]['name']);
+                }
             }
             if(isset($calls[$i])){
                 $best_attack_ = false;
@@ -226,22 +236,35 @@ class ClashCaller
         $general_ = $data['general'];
         $now = strtotime($data['general']['checktime']);
         $war_start = strtotime($data['general']['starttime']);
-        $targets = isset($data['targets']) ? $this -> serialize_targets($data['targets']) : false;
+        $war_end = $war_start + $this -> timer_to_second('24h00m');
         $war_started = false;
+        $war_size = intval($data['general']['size']);
         $diff = $war_start - $now;
+        $out = array();
+        $calls = $this -> serialize_calls($data['calls'], $data['general'], false);
+        $targets = isset($data['targets']) ? $this -> serialize_targets($data['targets']) : false;
+        $out = array();
         if($war_start < $now){
             $war_started = true;
-            $diff = $war_start + $this -> timer_to_second('24h00m') - $now;
+            $diff = $war_end - $now;
         }
-        $war_time = $this->second_to_timer($diff);
-        $out = array();
-        array_push($out, sprintf("War %s in %s vs %s", ($war_started ? 'ends' : 'starts'), $war_time, $data['general']['enemyname']));
+        if($now > $war_end){
+            array_push($out, sprintf("War has finished vs %s", $data['general']['enemyname']));
+        }else {
+            $war_time = $this->second_to_timer($diff);
+            array_push($out, sprintf("War %s in %s vs %s", ($war_started ? 'ends' : 'starts'), $war_time, $data['general']['enemyname']));
+        }
+
         $calls = $this -> serialize_calls($data['calls'], $data['general'], $only_active);
         foreach($calls as $num => $call){
             $call__ = array();
             $target_name_ = '';
             if($targets){
-                if(isset($targets[$num])) $target_name_ = sprintf(" (%s)", $targets[$num]);
+                if(isset($targets[$num])) {
+                    if(strlen($targets[$num]['name']) > 0){
+                        $target_name_ = sprintf(" (%s)", $targets[$num]['name']);
+                    }
+                }
             }
             if($this -> config['stacked_calls']){
                 foreach($call as $c){
@@ -298,6 +321,34 @@ class ClashCaller
         }
         return "Townhall breakdown set on CC";
     }
+    public function update_note($target, $note){
+        $data = array('REQUEST' => 'UPDATE_TARGET_NOTE',
+                      'warcode' => $this -> cc,
+                      'posy' => $target - 1,
+                      'value' => $note);
+        $this->api_call($data);
+        return sprintf("Note on %d updated", $target);
+    }
+    public function get_note($target){
+        $num = $target - 1;
+        $data = $this -> get_update();
+        if($num <= intval($data['general']['size'])){
+            $targets = isset($data['targets']) ? $this -> serialize_targets($data['targets']) : false;
+            if(!isset($targets[$num])){
+                return "No note on #" . $target . " found";
+            }else{
+                $tx_ = $targets[$num];
+                $name__ = ($tx_['name'] == '') ? '' : " ({$tx_['name']})";
+                if($tx_['note'] != ''){
+                    return sprintf("#%d%s: %s", $target, $name__, $tx_['note']);
+                }else{
+                    return "No note on #" . $target . " found";
+                }
+            }
+        }else{
+            return "Target out of bounds";
+        }
+    }
     public function format_call($data, $general, $status = false){
         $check_time = strtotime($general['checktime']);
         $war_start = strtotime($general['starttime']);
@@ -348,7 +399,7 @@ class ClashCaller
         foreach($targets as $t){
             $pos_ = intval($t['position']);
             if(!isset($out[$pos_])){
-                $out[$pos_] = $t['name'];
+                $out[$pos_] = array('name' => $t['name'], 'note' => $t['note']);
             }
         }
         return $out;

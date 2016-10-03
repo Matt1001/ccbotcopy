@@ -58,9 +58,10 @@ function install_bot($group_id, $token, $bot_config){
                   'clan_tag' => '',
                   'archive' => 0,
                   'stacked_calls' => 0,
-                  'call_timer' => 2);
+                  'call_timer' => 2,
+                  'proposed' => '[]');
     mysqli_query($GLOBALS['con'], "INSERT INTO `cc`" . safe_sql($GLOBALS['con'], $ins));
-    post_gm("Welcome to Clash Caller bot. Type '/bot status' to see current status.\n/help admin - see admin commands\n/help - see normal commands", $bot_id);
+    post_gm("Welcome to Clash Caller bot. Type '/bot status' to see current status.\n/help admin - see admin commands\n/help full - see all commands\n/help - see normal commands", $bot_id);
     return "Bot made successfully";
 }
 function gm_respond($gm, $row)
@@ -71,7 +72,7 @@ function gm_respond($gm, $row)
           'clan_tag' => $row['clan_tag'],
           'call_timer' => $row['call_timer'],
           'archive' => $row['archive'],
-          'stacked_calls' => $row['stacked_calls'],
+          'stacked_calls' => $row['stacked_calls']
       );
     $row_cc = $row['cc'];
     $cc = new ClashCaller();
@@ -83,37 +84,63 @@ function gm_respond($gm, $row)
     $name_ = $gm['name'];
     $uid_ = $gm['user_id'];
     $admins = json_decode($row['admins'], true);
+    $assigned = json_decode($row['proposed'], true);
     $row_id = $row['id'];
 
+    $command_found = false;
+    $message = '';
 
-    $admin_commands = array('CC admin commands: ',
+    $admin_commands = array('>Admin commands: ',
                       '/start war [war size] [enemy name] - Start new caller',
                       '/set cc [code] - Set code',
-                      '/set breakdown [#/#/#/#] [#/#/#/#] - Set townhall breakdown on CC',
-                      '/update war timer [end|start] [timer] - Change war timer (##h##m)',
+                      '/update war timer [end|start] [timer] - Change war timer (##h##m)', '',
+                      '/set breakdown [#/#/#/#] [#/#/#/#] - Set townhall breakdown on CC', '',
                       '/set clan name [clan name] - Set clan name',
-                      '/set clan tag [clan tag] - Set clan tag',
+                      '/set clan tag [clan tag] - Set clan tag', '',
                       '/cc timer # hours - Set call timer on CC',
                       '/cc archive [on|off] - CC archive toggle',
-                      '/cc stacked calls [on|off] - Stacked calls toggle',
+                      '/cc stacked calls [on|off] - Stacked calls toggle', '',
                       '/cc promote @[player name] - Promote player to admin',
-                      '/cc demote @[player name] - Demote player from admin'
+                      '/cc demote @[player name] - Demote player from admin', '',
+                      '/assign # to @[player name] - Assign base to tagged player',
+                      '/clear assigned base # - Delete base assigned for players',
+                      '/clear all assigned bases - Delete all assigned bases for the war'
                     );
-    $cc_commands = array('CC commands: ',
-                      '/bot status - See bot status',
+
+    $full_commands = array('>All commands: ',
                       '/cc - Get CC link',
-                      '/cc code - Get CC code',
+                      '/cc code - Get CC code', '',
                       '/call # - Call target',
-                      '/call # for [player name] - Call target for player',
+                      '/call # for [player name] - Call target for player', '',
                       '/attacked # for # stars - Log attack',
-                      '/log # stars on # by [player name] - Log attack for player',
+                      '/log # stars on # by [player name] - Log attack for player', '',
                       '/delete call # - Delete call',
-                      '/delete call on # by [player name] - Delete call by player',
+                      '/delete call on # by [player name] - Delete call by player', '',
                       '/get calls - Get active calls',
                       '/get all calls - Get all calls',
-                      '/get war status - Get status on war',
+                      '/get war status - Get status on war', '',
+                      '/get note # - Get note on target',
+                      '/update note # [note] - Update note on target', '',
                       '/my stats - View your stats',
-                      '/stats for [player name] - View stats for player');
+                      '/stats for [player name] - View stats for player', '',
+                      '/get my base - Get base assigned to you',
+                      '/decline my base - Decline base assigned to you',
+                      '/get assigned bases - Get all assigned bases');
+
+    $normal_commands = array('>Caller commands: ',
+                            '/cc - Get CC link',
+                            '/call # - Call target',
+                            '/attacked # for # stars - Log attack',
+                            '/delete call # - Delete call',
+                            '/get calls - Get active calls',
+                            '/get war status - Get status on war',
+                            '/get note # - Get note on target',
+                            '/get my base - Get base assigned to you',
+                            '/decline my base - Decline base assigned to you', '',
+                            '/bot status - View bot status',
+                            '/help full - Show all commands',
+                            '/help admin - Show admin commands',
+                            '@leadership - Tag leadership');
 
     $regex_ = array(
       'call' => "/^\/call (\d+)\s*$/i",
@@ -127,6 +154,7 @@ function gm_respond($gm, $row)
       'log_attack_for' => "/^\/log (\d+) star[s]? on (\d+) by (.*)$/i",
       'help' => "/^\/help\s*$/i",
       'help_admin' => "/^\/help admin\s*$/i",
+      'help_full' => "/^\/help full\s*$/i",
       'set_cc' => "/^\/set cc (.*)/",
       'start_war' => "/^\/start war (\d+)\s+(.*)$/i",
       'cc_url' => "/^\/cc\s*$/i",
@@ -141,23 +169,147 @@ function gm_respond($gm, $row)
       'update_stacked_calls' => "/^\/cc stacked calls (on|off)/i",
       'update_archive' => "/^\/cc archive (on|off)/i",
       'update_call_timer' => "/^\/cc timer (\d+) hours/i",
-      'admin_promote' => "/^\/cc promote (.*)/",
-      'admin_demote' => "/^\/cc demote (.*)/",
-      'cc_bd' => "/^\/set breakdown ([\d\/]+) ([\d\/\.]+)/",
+      'admin_promote' => "/^\/cc promote (.*)/i",
+      'admin_demote' => "/^\/cc demote (.*)/i",
+      'cc_bd' => "/^\/set breakdown ([\d\/]+) ([\d\/\.]+)/i",
+      'update_note' => "/^\/update note (\d+) (.*)/i",
+      'get_note' => "/^\/get note (\d+)/i",
+      'assign_base' => "/^\/assign (\d+) to @(.*)/i",
+      'get_my_base' => "/^\/get my base/",
+      'decline_my_base' => "/^\/decline my base/",
+      'get_assigned_bases' => "/^\/get assigned bases/",
+      'clear_assigned_base' => "/^\/clear assigned base (\d+)/",
+      'clear_all_assigned_bases' => "/^\/clear all assigned bases/",
+      'tag_admins' => "/@leadership/i"
       );
-    $command_found = false;
-    $message = '';
     $invalid_cc_error = "No caller code set. Type '/help admin' to see commands";
     foreach ($regex_ as $key => $reg) {
         if (preg_match($reg, $gm['text'], $out)) {
             $command_found = true;
             switch ($key) {
                   case 'help':
-                      $message = implode("\n", $cc_commands);
+                      $message = implode("\n", $normal_commands);
                   break;
                   case 'help_admin':
                       $message = implode("\n", $admin_commands);
                   break;
+                  case 'help_full':
+                      $message = implode("\n", $full_commands);
+                  break;
+                  case 'tag_admins':
+                      $out = array('text' => 'Hey ', 'bot_id' => $row['bot_id'], 'attachments' => array(
+                              array('loci' => array(),
+                                    'user_ids' => array(),
+                                    'type' => 'mentions')
+                              ));
+                      $pos_ = strlen($out['text']);
+                      $anames = array();
+                      foreach($admins as $a){
+                          $len_ = strlen($a['name']);
+                          array_push($out['attachments'][0]['user_ids'], $a['id']);
+                          array_push($out['attachments'][0]['loci'], array($pos_, $len_));
+                          $pos_ += $len_   + 2;
+                          array_push($anames, $a['name']);
+                      }
+                      $out['text'] = sprintf("Hey %s! %s needs help", implode(', ', $anames), $name_);
+                      $page = Requests::post('https://api.groupme.com/v3/bots/post', array('Content-Type' => 'application/json'), json_encode($out));
+                  break;
+                  case 'clear_all_assigned_bases':
+                      if($cc->is_admin($uid_, $admins)){
+                          mysqli_query($GLOBALS['con'], "UPDATE cc SET proposed = '[]' WHERE id = '{$row_id}'");
+                          $message = "Cleared all assigned bases";
+                      }else{
+                          $message = "Only admins can clear assigned bases";
+                      }
+                  break;
+                  case 'clear_assigned_base':
+                      $num = intval($out[1]) - 1;
+                      if($cc->is_admin($uid_, $admins)){
+                          if(!isset($assigned[$num])){
+                              $message = sprintf("No base assigned to %s base yet", $out[1]);
+                          }else{
+                              $user_name_ = $assigned[$num]['name'];
+                              unset($assigned[$num]);
+                              $assigned_json = json_encode($assigned);
+                              mysqli_query($GLOBALS['con'], "UPDATE cc SET proposed = '{$assigned_json}' WHERE id = '{$row_id}'");
+                              $message = sprintf("Removed #%d base, assigned to %s", $out[1], $user_name_);
+                          }
+                      }else{
+                          $message = "Only admins can clear an assigned base";
+                      }
+                  break;
+                  case 'assign_base':
+                      $num = intval($out[1]) - 1;
+                      if($cc->is_admin($uid_, $admins)){
+                          if (count($gm['attachments']) > 0) {
+                              if ($gm['attachments'][0]['type'] == 'mentions') {
+                                  $user_id = $gm['attachments'][0]['user_ids'][0];
+                                  list($ls, $ln) = $gm['attachments'][0]['loci'][0];
+                                  $user_name_ = trim($out[2]);
+                                  if(isset($assigned[$num])){
+                                      $message = sprintf("Base #%d already assigned to %s", $out[1], $assigned[$num]['name']);
+                                  }else{
+                                      $assigned[$num] = array('user_id' => $user_id, 'name' => $user_name_);
+                                      $assigned_json = json_encode($assigned);
+                                      mysqli_query($GLOBALS['con'], "UPDATE cc SET proposed = '{$assigned_json}' WHERE id = '{$row_id}'");
+                                      $message = sprintf("Base #%d assigned to %s", $out[1], $user_name_);
+                                  }
+                              }
+                          }else{
+                             $message = "Please tag a player to assign the base";
+                          }
+                      }else{
+                          $message = "Only admins can assign a base";
+                      }
+                  break;
+                  case 'get_my_base':
+                      $found_user = false;
+                      foreach($assigned as $num => $val){
+                          if($val['user_id'] == $uid_){
+                              $found_user = true;
+                              $base_num = $num + 1;
+                              $base_name = $val['name'];
+                              break;
+                          }
+                      }
+                      if($found_user){
+                          $message = sprintf("#%d base assigned to you, %s", $base_num, $base_name);
+                      }else{
+                          $message = "No assigned base found for you, " . $name_;
+                      }
+                  break;
+                  case 'decline_my_base':
+                      $found_user = false;
+                      foreach($assigned as $num => $val){
+                          if($val['user_id'] == $uid_){
+                              $found_user = true;
+                              $base_num = $num;
+                              $base_name = $val['name'];
+                              break;
+                          }
+                      }
+                      if($found_user){
+                          unset($assigned[$base_num]);
+                          $assigned_json = json_encode($assigned);
+                          mysqli_query($GLOBALS['con'], "UPDATE cc SET proposed = '{$assigned_json}' WHERE id = '{$row_id}'");
+                          $message = sprintf("Removed #%d base, assigned to %s", $base_num + 1, $base_name);
+                      }else{
+                          $message = "No assigned base found for you, " . $name_;
+                      }
+                  break;
+                  case 'get_assigned_bases':
+                      if(count($assigned) == 0){
+                          $message = "No assigned bases yet";
+                      }else{
+                          $out = array("Currently assigned bases: ");
+                          ksort($assigned);
+                          foreach($assigned as $num => $val){
+                              array_push($out, sprintf("#%d: %s", $num + 1, $val['name']));
+                          }
+                          return implode("\n", $out);
+                      }
+                  break;
+
                   case 'set_cc':
                       $code = trim($out[1]);
                       if ($cc->is_admin($uid_, $admins)) {
@@ -165,6 +317,23 @@ function gm_respond($gm, $row)
                           $message = 'CC code updated to: '.$code;
                       } else {
                           $message = 'Only admins can change cc code, '.$name_;
+                      }
+                  break;
+                  case 'update_note':
+                      $num = intval($out[1]);
+                      $note = trim($out[2]);
+                      if ($invalid_cc) {
+                          $message = $invalid_cc_error;
+                      } else {
+                          $message = $cc->update_note($num, $note);
+                      }
+                  break;
+                  case 'get_note':
+                      $num = intval($out[1]);
+                      if ($invalid_cc) {
+                          $message = $invalid_cc_error;
+                      } else {
+                          $message = $cc->get_note($num);
                       }
                   break;
                   case 'call':
@@ -179,6 +348,11 @@ function gm_respond($gm, $row)
                   case 'call_for':
                       $num = intval($out[1]);
                       $name = trim($out[2]);
+                      if(count($gm['attachments']) > 0){
+                          if($gm['attachments'][0]['type'] == 'mentions'){
+                              $name = substr($name, 1);
+                          }
+                      }
                       if ($invalid_cc) {
                           $message = $invalid_cc_error;
                       } else {
@@ -197,6 +371,11 @@ function gm_respond($gm, $row)
                   case 'clear_call_for':
                       $num = intval($out[1]);
                       $name = trim($out[2]);
+                      if(count($gm['attachments']) > 0){
+                          if($gm['attachments'][0]['type'] == 'mentions'){
+                              $name = substr($name, 1);
+                          }
+                      }
                       if ($invalid_cc) {
                           $message = $invalid_cc_error;
                       } else {
@@ -244,6 +423,11 @@ function gm_respond($gm, $row)
                       $num = intval($out[2]);
                       $stars = intval($out[1]);
                       $name = trim($out[3]);
+                      if(count($gm['attachments']) > 0){
+                          if($gm['attachments'][0]['type'] == 'mentions'){
+                              $name = substr($name, 1);
+                          }
+                      }
                       if ($invalid_cc) {
                           $message = $invalid_cc_error;
                       } else {
@@ -259,7 +443,7 @@ function gm_respond($gm, $row)
                           } else {
                               $war = $cc->start_war($enemy, $size);
                               if (isset($war['war_id'])) {
-                                  mysqli_query($GLOBALS['con'], "UPDATE cc SET cc = '{$war['war_id']}' WHERE id = '{$row_id}'");
+                                  mysqli_query($GLOBALS['con'], "UPDATE cc SET cc = '{$war['war_id']}', proposed = '[]' WHERE id = '{$row_id}'");
                                   $message = "War started against {$enemy}. CC code: {$war['war_id']}";
                               } else {
                                   $message = 'Unknown error';

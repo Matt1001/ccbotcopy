@@ -15,7 +15,8 @@ CREATE TABLE `cc` (
   `archive` tinyint(1) NOT NULL,
   `stacked_calls` tinyint(1) NOT NULL,
   `call_timer` int(11) NOT NULL,
-  `cc` text NOT NULL
+  `cc` text NOT NULL,
+  `proposed` text NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 
