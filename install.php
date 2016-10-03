@@ -163,7 +163,7 @@ if(isset($_GET['delete_bot'])){
         </blockquote>
       </li>
       <li>
-        <strong>Why do no stats show for my player name?</strong>
+        <strong>Why do no stats show up for my player name?</strong>
         <blockquote>
           Stats are fetched from archived wars in clash caller website. Your clan tag must be correct and the player name in order to fetch correct stats.
         </blockquote>
