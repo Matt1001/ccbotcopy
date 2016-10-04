@@ -43,6 +43,7 @@ if (isset($_COOKIE['token'])) {
     $bot_page = Requests::get(sprintf('%s/bots?token=%s', $gm_api, $token));
     $bot_list = json_decode($bot_page->body, true);
     $bot_list_table = array();
+    $group_list = array();
     $bot_ids = array();
     foreach($bot_list['response'] as $bot){
         array_push($bot_ids, $bot['bot_id']);
@@ -66,7 +67,6 @@ if (isset($_COOKIE['token'])) {
         array_push($group_list, $op_);
     }
     $group_list = implode("\n", $group_list);
-
     $logged_in = true;
 }
 if(isset($_GET['delete_bot'])){
