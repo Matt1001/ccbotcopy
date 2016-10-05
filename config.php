@@ -2,7 +2,7 @@
 require 'vendor/autoload.php';
 $main_config = array('groupme_oauth_link' => '', // Your GroupMe Application oauth Link
                       'bot_name' => 'CC Bot', // Default bot name
-                      'single_bot_per_user' => true, // Set to true to only allow one bot per user
+                      'single_bot_per_user' => false, // Set to true to only allow one bot per user
                       'mysql' => array('host' => 'localhost', // MySQL host name
                                       'username' => '', // MySQL username
                                       'password' => '', // MySQL password
