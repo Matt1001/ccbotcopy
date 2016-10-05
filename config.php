@@ -4,9 +4,9 @@ $main_config = array('groupme_oauth_link' => 'https://oauth.groupme.com/oauth/au
                       'bot_name' => 'CC Bot', // Default bot name
                       'single_bot_per_user' => false, // Set to true to only allow one bot per user
                       'mysql' => array('host' => 'localhost', // MySQL host name
-                                      'username' => '', // MySQL username
-                                      'password' => '', // MySQL password
-                                      'database' => '') // MySQL database name
+                                      'username' => 'admina2dDI5f', // MySQL username
+                                      'password' => 'W2QJ2SGpcL9e', // MySQL password
+                                      'database' => 'ccbot') // MySQL database name
                       );
 
 /* DON'T CHANGE ANYTHING BELOW */ 
