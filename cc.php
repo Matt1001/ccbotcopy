@@ -57,7 +57,7 @@ class ClashCaller
         return "War time updated";
 
     }
-    public function update_stars($num, $stars, $name){
+    public function update_stars($num, $stars, $name, $greeting = '', $is_admin = false){
         if($stars < 0 || $stars > 3){
             return 'Invalid stars';
         }
@@ -66,7 +66,12 @@ class ClashCaller
         $y_ = $num - 1;
         $found_call = false;
         if(!isset($calls[$y_])){
-            return sprintf("You have no calls on #%d, %s", $num, $name);
+            if($is_admin){
+                $this -> call_target($num, $name);
+                return $this -> update_stars($num, $stars, $name, $greeting, $is_admin);
+            }else{
+                return sprintf("You have no calls on #%d, %s", $num, $name);
+            }
         }else{
             foreach($calls[$y_] as $k => $c){
                 if($c['name'] == $name){
@@ -77,15 +82,27 @@ class ClashCaller
             }
         }
         if($found_call){
+            $cgn_message = '';
+            if($greeting != ''){
+                if($stars == 3){
+                    $cgn_message = preg_replace("/@name/", $name, $greeting);
+                    $cgn_message = "\n" . $this->spin_text($cgn_message);
+                }
+            }
             $data = array('REQUEST' => 'UPDATE_STARS',
                       'warcode' => $this->cc,
                       'posx' => $x_,
                       'posy' => $y_,
                       'value' => $stars + 2);
             $this -> api_call($data);
-            return sprintf("Logged %d stars on #%d by %s", $stars, $num, $name);
+            return sprintf("Logged %d stars on #%d by %s%s", $stars, $num, $name, $cgn_message);
         }else{
-            return sprintf("You have no calls on #%d, %s", $num, $name);
+            if($is_admin){
+                $this -> call_target($num, $name);
+                return $this -> update_stars($num, $stars, $name, $greeting, $is_admin);
+            }else{
+                return sprintf("You have no calls on #%d, %s", $num, $name);
+            }
         }
     }
     public function delete_call($num, $name){
@@ -353,25 +370,40 @@ class ClashCaller
         $check_time = strtotime($general['checktime']);
         $war_start = strtotime($general['starttime']);
         $call_start = strtotime($data['calltime']);
-        $call_end = strtotime($data['calltime']) + (intval($general['timerlength']) * 60 * 60);
+        $call_timer = intval($general['timerlength']);
+        $timer_show = true;
+        if($call_timer > 0){
+            $call_end = strtotime($data['calltime']) + ($call_timer * 60 * 60);
+        }else if($call_timer < 0){
+            if($call_start < $war_start) $call_start = $war_start;
+            $diff_ = $war_start + $this -> timer_to_second('24h00m') - $check_time;
+            $diff_ /= abs($call_timer);
+            $call_end = $call_start + $diff_;
+        }else{
+            $timer_show = false;
+            $active_call = true;
+            $timer_text = 'called';
+        }
         $active_call = true;
         $attacked = false;
         $stars = 0;
-        if($call_start < $war_start){
-            $call_end = $war_start + (intval($general['timerlength']) * 60 * 60);
-        }
-        if($call_end < $check_time){
-            $timer_text = 'expired';
-            $active_call = false;
-        }else{
-            $diff = $call_end - $check_time;
-            $timer_text = $this -> second_to_timer($diff);
-        }
-        if($war_start > $check_time){
-            $timer_text = 'called';
-        }
-        if($general['timerlength'] == '0'){
-            $timer_text = 'called';
+        if($timer_show){
+            if($call_start < $war_start){
+                $call_end = $war_start + (intval($general['timerlength']) * 60 * 60);
+            }
+            if($call_end < $check_time){
+                $timer_text = 'expired';
+                $active_call = false;
+            }else{
+                $diff = $call_end - $check_time;
+                $timer_text = $this -> second_to_timer($diff);
+            }
+            if($war_start > $check_time){
+                $timer_text = 'called';
+            }
+            if($general['timerlength'] == '0'){
+                $timer_text = 'called';
+            }
         }
         if($data['stars'] > 1){
             $active_call = false;
@@ -463,5 +495,19 @@ class ClashCaller
         }else{
             return 0;
         }
+    }
+    public function spin_text($text)
+    {
+        return preg_replace_callback(
+            '/\{(((?>[^\{\}]+)|(?R))*)\}/x',
+            array($this, 'replace'),
+            $text
+        );
+    }
+    public function replace($text)
+    {
+        $text = $this->spin_text($text[1]);
+        $parts = explode('|', $text);
+        return $parts[array_rand($parts)];
     }
 }

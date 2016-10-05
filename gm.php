@@ -59,7 +59,8 @@ function install_bot($group_id, $token, $bot_config){
                   'archive' => 0,
                   'stacked_calls' => 0,
                   'call_timer' => 2,
-                  'proposed' => '[]');
+                  'proposed' => '[]',
+                  'congrats' => '');
     mysqli_query($GLOBALS['con'], "INSERT INTO `cc`" . safe_sql($GLOBALS['con'], $ins));
     post_gm("Welcome to Clash Caller bot. Type '/bot status' to see current status.\n/help admin - see admin commands\n/help full - see all commands\n/help - see normal commands", $bot_id);
     return "Bot made successfully";
@@ -90,6 +91,16 @@ function gm_respond($gm, $row)
     $command_found = false;
     $message = '';
 
+    if($gm['user_id'] == 'system'){
+        if(isset($gm['event'])){
+            if($gm['event']['type'] == 'membership.notifications.joined' || $gm['event']['type'] == 'membership.notifications.rejoined'){
+                $command_found = true;
+                $message = "Welcome to Clash Caller bot. Type '/bot status' to see current status.\n/help admin - see admin commands\n/help - see normal commands";
+            }
+        }
+    }
+
+
     $admin_commands = array('>Admin commands: ',
                       '/start war [war size] [enemy name] - Start new caller',
                       '/set cc [code] - Set code',
@@ -104,7 +115,9 @@ function gm_respond($gm, $row)
                       '/cc demote @[player name] - Demote player from admin', '',
                       '/assign # to @[player name] - Assign base to tagged player',
                       '/clear assigned base # - Delete base assigned for players',
-                      '/clear all assigned bases - Delete all assigned bases for the war'
+                      '/clear all assigned bases - Delete all assigned bases for the war',
+                      '/set congrats message [message] - Message to show when player 3 stars',
+                      '/turn off congrats - Turn off congrats message'
                     );
 
     $full_commands = array('>All commands: ',
@@ -124,8 +137,7 @@ function gm_respond($gm, $row)
                       '/my stats - View your stats',
                       '/stats for [player name] - View stats for player', '',
                       '/get my base - Get base assigned to you',
-                      '/decline my base - Decline base assigned to you',
-                      '/get assigned bases - Get all assigned bases');
+                      '/decline my base - Decline base assigned to you', '');
 
     $normal_commands = array('>Caller commands: ',
                             '/cc - Get CC link',
@@ -168,7 +180,7 @@ function gm_respond($gm, $row)
       'update_clan_tag' => "/^\/set clan tag (.*)/i",
       'update_stacked_calls' => "/^\/cc stacked calls (on|off)/i",
       'update_archive' => "/^\/cc archive (on|off)/i",
-      'update_call_timer' => "/^\/cc timer (\d+) hours/i",
+      'update_call_timer' => "/^\/cc timer (flex)?\s*(\d+)\s*(hours)?/i",
       'admin_promote' => "/^\/cc promote (.*)/i",
       'admin_demote' => "/^\/cc demote (.*)/i",
       'cc_bd' => "/^\/set breakdown ([\d\/]+) ([\d\/\.]+)/i",
@@ -180,7 +192,9 @@ function gm_respond($gm, $row)
       'get_assigned_bases' => "/^\/get assigned bases/",
       'clear_assigned_base' => "/^\/clear assigned base (\d+)/",
       'clear_all_assigned_bases' => "/^\/clear all assigned bases/",
-      'tag_admins' => "/@leadership/i"
+      'tag_admins' => "/@leadership/i",
+      'set_congrats' => "/^\/set congrats message (.*)/",
+      'off_congrats' => "/^\/turn off congrats/"
       );
     $invalid_cc_error = "No caller code set. Type '/help admin' to see commands";
     foreach ($regex_ as $key => $reg) {
@@ -196,6 +210,24 @@ function gm_respond($gm, $row)
                   case 'help_full':
                       $message = implode("\n", $full_commands);
                   break;
+                  case 'off_congrats':
+                      if($cc->is_admin($uid_, $admins)){
+                          mysqli_query($GLOBALS['con'], "UPDATE cc SET congrats = '' WHERE id = '{$row_id}'");
+                          $message = "Turned off congrats message";
+                      }else{
+                          $message = "Only admins can turn off congrats message, " . $name_;
+                      }
+                  break;
+                  case 'set_congrats':
+                      $cgn_message = mysqli_real_escape_string($GLOBALS['con'], trim($out[1]));
+                      if($cc->is_admin($uid_, $admins)){
+                          mysqli_query($GLOBALS['con'], "UPDATE cc SET congrats = '{$cgn_message}' WHERE id = '{$row_id}'");
+                          $message = sprintf("Congrats message set to: %s", $out[1]);
+                      }else{
+                          $message = "Only admins can set congrats message, " . $name_;
+                      }
+                  break;
+
                   case 'tag_admins':
                       $out = array('text' => 'Hey ', 'bot_id' => $row['bot_id'], 'attachments' => array(
                               array('loci' => array(),
@@ -311,7 +343,7 @@ function gm_respond($gm, $row)
                   break;
 
                   case 'set_cc':
-                      $code = trim($out[1]);
+                      $code = mysqli_real_escape_string($GLOBALS['con'], trim($out[1]));
                       if ($cc->is_admin($uid_, $admins)) {
                           mysqli_query($GLOBALS['con'], "UPDATE cc SET cc = '{$code}' WHERE id = '{$row_id}'");
                           $message = 'CC code updated to: '.$code;
@@ -416,7 +448,7 @@ function gm_respond($gm, $row)
                       if ($invalid_cc) {
                           $message = $invalid_cc_error;
                       } else {
-                          $message = $cc->update_stars($num, $stars, $name);
+                          $message = $cc->update_stars($num, $stars, $name, $row['congrats']);
                       }
                   break;
                   case 'log_attack_for':
@@ -428,10 +460,11 @@ function gm_respond($gm, $row)
                               $name = substr($name, 1);
                           }
                       }
+                      $is_admin = $cc->is_admin($uid_, $admins);
                       if ($invalid_cc) {
                           $message = $invalid_cc_error;
                       } else {
-                          $message = $cc->update_stars($num, $stars, $name);
+                          $message = $cc->update_stars($num, $stars, $name, $row['congrats'], $is_admin);
                       }
                   break;
                   case 'start_war':
@@ -482,19 +515,21 @@ function gm_respond($gm, $row)
                   break;
                   case 'status':
                       $clan_name_ = ($row['clan_name'] == '') ? 'not set' : $row['clan_name'];
-                      $clan_tag_ = ($row['clan_tag'] == '') ? 'not set' : '#'.strtoupper($row['clan_tag']);
+                      $clan_tag_ = ($row['clan_tag'] == '') ? 'not set' : strtoupper($row['clan_tag']);
                       $archive_ = ($row['archive']) ? 'yes' : 'no';
                       $stacked_ = ($row['stacked_calls']) ? 'yes' : 'no';
                       $cc_code_ = ($row['cc'] == '') ? 'not set' : $row['cc'];
+                      $congrats_ = ($row['congrats'] == '') ? 'not set' : $row['congrats'];
+                      $call_timer_ = ($row['call_timer'] >= 0) ? sprintf("%s hours", $row['call_timer']) : sprintf("flex %d", abs($row['call_timer']));
                       $admin_list = array();
                       foreach ($admins as $a) {
                           array_push($admin_list, $a['name']);
                       }
-                      $message = sprintf("CC Bot - \nInstall at: %s\nCaller code: %s\nCreator: %s\nAdmins: %s\nClan name: %s\nClan tag: %s\nArchive: %s\nAllow stacked calls: %s\nTimer length: %d hours",
-                                          $install_link, $cc_code_, $row['admin_name'], implode(', ', $admin_list), $clan_name_, $clan_tag_, $archive_, $stacked_, $row['call_timer']);
+                      $message = sprintf("CC Bot - \nInstall at: %s\nCaller code: %s\nCreator: %s\nAdmins: %s\nClan name: %s\nClan tag: %s\nArchive: %s\nAllow stacked calls: %s\nTimer length: %s\nCongrats message: %s",
+                                          $install_link, $cc_code_, $row['admin_name'], implode(', ', $admin_list), $clan_name_, $clan_tag_, $archive_, $stacked_, $call_timer_, $congrats_);
                   break;
                   case 'update_clan_name':
-                      $clan_name = trim($out[1]);
+                      $clan_name = mysqli_real_escape_string($GLOBALS['con'], trim($out[1]));
                       if ($cc->is_admin($uid_, $admins)) {
                           mysqli_query($GLOBALS['con'], "UPDATE cc SET clan_name = '{$clan_name}' WHERE id = '{$row_id}'");
                           $message = 'Clan name set to: '.$clan_name;
@@ -503,7 +538,7 @@ function gm_respond($gm, $row)
                       }
                   break;
                   case 'update_clan_tag':
-                      $clan_tag = trim($out[1]);
+                      $clan_tag = mysqli_real_escape_string($GLOBALS['con'], trim($out[1]));
                       if ($cc->is_admin($uid_, $admins)) {
                           mysqli_query($GLOBALS['con'], "UPDATE cc SET clan_tag = '{$clan_tag}' WHERE id = '{$row_id}'");
                           $message = 'Clan tag set to: #'.strtoupper($clan_tag);
@@ -560,13 +595,26 @@ function gm_respond($gm, $row)
                       }
                   break;
                   case 'update_call_timer':
-                      $timer = intval($out[1]);
                       if ($cc->is_admin($uid_, $admins)) {
-                          if ($timer > 0 && $timer < 24) {
-                              mysqli_query($GLOBALS['con'], "UPDATE cc SET call_timer = {$timer} WHERE id = '{$row_id}'");
-                              $message = 'Clash Caller timer set to '.$out[1].' hours';
-                          } else {
-                              $message = 'Set timer between 0 to 24 hours only';
+                          $error_ = false;
+                          if($out[1] == 'flex'){
+                              if($out[2] != '2' && $out[2] != '4'){
+                                  $message = "Flex timer can be set 1/2 or 1/4 only";
+                                  $error_ = true;
+                              }
+                              $timer = -1 * intval($out[2]);
+                              $str_ = sprintf("%s %s", $out[1], $out[2]);
+                          }else{
+                              $timer = intval($out[2]);
+                              $str_ = $out[2] . " hours";
+                          }
+                          if(!$error_){
+                              if ($timer <= 23) {
+                                  mysqli_query($GLOBALS['con'], "UPDATE cc SET call_timer = {$timer} WHERE id = '{$row_id}'");
+                                  $message = 'Clash Caller timer set to '. $str_;
+                              } else {
+                                  $message = 'Set timer between 0 to 24 hours only';
+                              }
                           }
                       } else {
                           $message = 'Only admins can change CC settings, '.$name_;

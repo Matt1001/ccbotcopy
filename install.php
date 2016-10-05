@@ -232,6 +232,9 @@ if(isset($_GET['delete_bot'])){
     /clear assigned base # - Delete base assigned for players
     /clear all assigned bases - Delete all assigned bases for the war
 
+    /set congrats message [message] - Message to show when player 3 stars
+    /turn off congrats - Turn off congrats message
+
   Examples:
     /call 2
     /call 7 for John
